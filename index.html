@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pitch Memory — Latih Telingamu, Satu Nada demi Nada</title>
+<meta name="description" content="Game memori musik untuk Android. Dengarkan urutan nada piano, lalu tirukan. 25 level ear training — gratis, tanpa iklan, main offline.">
+
+<!-- Open Graph / Play Store friendly preview -->
+<meta property="og:title" content="Pitch Memory">
+<meta property="og:description" content="Dengarkan. Tirukan. Naik level. Game ear training piano untuk Android.">
+<meta property="og:type" content="website">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+	:root {
+		--navy: #0a0f24;
+		--navy-deep: #05070f;
+		--navy-light: #182352;
+		--gold: #d9b45b;
+		--gold-bright: #f3d489;
+		--warm: #ffecbe;
+		--ink: #eef0fb;
+		--ink-dim: rgba(238, 240, 251, 0.62);
+		--display: "Fraunces", Georgia, serif;
+		--ui: "Space Grotesk", system-ui, sans-serif;
+	}
+
+	* { box-sizing: border-box; margin: 0; padding: 0; }
+
+	html { scroll-behavior: smooth; }
+
+	body {
+		font-family: var(--ui);
+		color: var(--ink);
+		background: var(--navy-deep);
+		line-height: 1.55;
+		overflow-x: hidden;
+		-webkit-font-smoothing: antialiased;
+	}
+
+	/* stage backdrop — echoes the in-game bg_stage.png */
+	.backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: -1;
+		background:
+			radial-gradient(120% 60% at 50% -10%, rgba(255, 236, 190, 0.10), transparent 60%),
+			radial-gradient(90% 50% at 50% 108%, rgba(217, 180, 91, 0.08), transparent 60%),
+			linear-gradient(180deg, var(--navy) 0%, var(--navy-deep) 70%);
+	}
+	.backdrop::after {
+		content: "";
+		position: absolute;
+		inset: 0;
+		background-image: radial-gradient(1px 1px at var(--x, 50%) var(--y, 50%), rgba(217,180,91,0.4), transparent);
+		opacity: 0.5;
+	}
+
+	.wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+	/* ---------- header ---------- */
+	header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 26px 0;
+	}
+	.brand {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		font-family: var(--display);
+		font-weight: 900;
+		font-size: 1.25rem;
+		letter-spacing: 0.01em;
+	}
+	.brand .dot {
+		width: 12px; height: 12px; border-radius: 50%;
+		background: var(--gold-bright);
+		box-shadow: 0 0 14px var(--gold);
+	}
+	.nav-cta {
+		font-family: var(--ui);
+		font-weight: 700;
+		font-size: 0.9rem;
+		color: var(--navy-deep);
+		background: var(--gold-bright);
+		padding: 10px 20px;
+		border-radius: 100px;
+		text-decoration: none;
+		transition: transform 0.18s ease, box-shadow 0.18s ease;
+	}
+	.nav-cta:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(217,180,91,0.35); }
+
+	/* ---------- hero ---------- */
+	.hero { padding: 40px 0 72px; text-align: center; }
+	.eyebrow {
+		font-size: 0.82rem;
+		letter-spacing: 0.28em;
+		text-transform: uppercase;
+		color: var(--gold);
+		font-weight: 500;
+		margin-bottom: 20px;
+	}
+	.hero h1 {
+		font-family: var(--display);
+		font-weight: 900;
+		font-size: clamp(2.8rem, 9vw, 5.6rem);
+		line-height: 0.98;
+		letter-spacing: -0.02em;
+		margin-bottom: 22px;
+		background: linear-gradient(180deg, var(--warm), var(--gold));
+		-webkit-background-clip: text;
+		background-clip: text;
+		-webkit-text-fill-color: transparent;
+	}
+	.hero .lede {
+		max-width: 540px;
+		margin: 0 auto 14px;
+		font-size: clamp(1.05rem, 2.4vw, 1.28rem);
+		color: var(--ink);
+	}
+	.hero .sub {
+		max-width: 480px;
+		margin: 0 auto 40px;
+		color: var(--ink-dim);
+		font-size: 0.98rem;
+	}
+
+	/* ---------- signature: playable keyboard ---------- */
+	.keyboard-stage {
+		max-width: 560px;
+		margin: 0 auto 20px;
+		padding: 26px 22px 20px;
+		border-radius: 22px;
+		background: linear-gradient(180deg, rgba(24,35,82,0.55), rgba(10,15,36,0.65));
+		border: 1px solid rgba(217,180,91,0.25);
+		box-shadow: 0 30px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+		position: relative;
+	}
+	.kb-hint {
+		font-size: 0.8rem;
+		color: var(--ink-dim);
+		letter-spacing: 0.04em;
+		margin-bottom: 16px;
+		min-height: 1.2em;
+		transition: color 0.2s ease;
+	}
+	.keyboard {
+		position: relative;
+		height: 190px;
+		display: flex;
+		justify-content: center;
+		gap: 4px;
+		touch-action: manipulation;
+	}
+	.key {
+		position: relative;
+		border: none;
+		cursor: pointer;
+		border-radius: 0 0 8px 8px;
+		padding: 0;
+		transition: transform 0.06s ease;
+		font-family: var(--ui);
+	}
+	.key:active, .key.down { transform: translateY(2px); }
+	.key.white {
+		width: 46px;
+		height: 190px;
+		background: linear-gradient(180deg, #fdfdf8, #cecec6);
+		box-shadow: inset 0 -6px 10px rgba(0,0,0,0.12);
+	}
+	.key.black {
+		position: absolute;
+		top: 0;
+		width: 30px;
+		height: 116px;
+		background: linear-gradient(180deg, #30303a, #0c0c12);
+		z-index: 2;
+		border-radius: 0 0 6px 6px;
+		box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+	}
+	.key .glow {
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		opacity: 0;
+		background: currentColor;
+		box-shadow: 0 0 24px currentColor;
+		transition: opacity 0.4s ease;
+		pointer-events: none;
+	}
+	.key.lit .glow { opacity: 0.85; transition: opacity 0.05s ease; }
+	.key .label {
+		position: absolute;
+		bottom: 8px;
+		left: 0; right: 0;
+		text-align: center;
+		font-size: 0.7rem;
+		font-weight: 500;
+		pointer-events: none;
+	}
+	.key.white .label { color: #1b2140; }
+	.key.black .label { color: rgba(255,255,255,0.75); font-size: 0.6rem; }
+
+	.kb-controls { margin-top: 18px; }
+	.listen-btn {
+		font-family: var(--ui);
+		font-weight: 700;
+		font-size: 0.92rem;
+		color: var(--gold-bright);
+		background: transparent;
+		border: 1px solid rgba(217,180,91,0.5);
+		padding: 11px 26px;
+		border-radius: 100px;
+		cursor: pointer;
+		transition: all 0.18s ease;
+	}
+	.listen-btn:hover:not(:disabled) { background: rgba(217,180,91,0.12); border-color: var(--gold-bright); }
+	.listen-btn:disabled { opacity: 0.5; cursor: default; }
+
+	/* ---------- store button ---------- */
+	.store-row {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 12px;
+		margin-top: 40px;
+	}
+	.gplay {
+		display: inline-flex;
+		align-items: center;
+		gap: 14px;
+		background: #000;
+		border: 1px solid rgba(255,255,255,0.22);
+		border-radius: 14px;
+		padding: 12px 26px;
+		text-decoration: none;
+		color: #fff;
+		transition: transform 0.18s ease, border-color 0.18s ease;
+	}
+	.gplay:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.5); }
+	.gplay svg { width: 30px; height: 30px; flex-shrink: 0; }
+	.gplay .gp-text { text-align: left; line-height: 1.1; }
+	.gplay .gp-small { font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.8; }
+	.gplay .gp-big { font-family: var(--ui); font-size: 1.28rem; font-weight: 500; }
+	.store-note { font-size: 0.78rem; color: var(--ink-dim); }
+
+	/* ---------- sections ---------- */
+	section { padding: 80px 0; }
+	.sec-eyebrow {
+		font-size: 0.78rem;
+		letter-spacing: 0.26em;
+		text-transform: uppercase;
+		color: var(--gold);
+		font-weight: 500;
+		text-align: center;
+		margin-bottom: 14px;
+	}
+	.sec-title {
+		font-family: var(--display);
+		font-weight: 600;
+		font-size: clamp(1.8rem, 5vw, 2.8rem);
+		text-align: center;
+		letter-spacing: -0.01em;
+		margin-bottom: 54px;
+	}
+
+	.features {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+		gap: 20px;
+	}
+	.feature {
+		padding: 30px 26px;
+		border-radius: 18px;
+		background: rgba(24,35,82,0.32);
+		border: 1px solid rgba(217,180,91,0.16);
+	}
+	.feature .ico {
+		font-size: 1.7rem;
+		margin-bottom: 14px;
+		display: block;
+	}
+	.feature h3 {
+		font-family: var(--display);
+		font-weight: 600;
+		font-size: 1.22rem;
+		margin-bottom: 8px;
+		color: var(--gold-bright);
+	}
+	.feature p { color: var(--ink-dim); font-size: 0.95rem; }
+
+	/* how it works — a real 3-step sequence, so numbering is earned */
+	.steps {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+		gap: 28px;
+		counter-reset: step;
+	}
+	.step { position: relative; padding-top: 12px; }
+	.step .num {
+		font-family: var(--display);
+		font-weight: 900;
+		font-size: 3.4rem;
+		line-height: 1;
+		color: transparent;
+		-webkit-text-stroke: 1.5px rgba(217,180,91,0.55);
+		margin-bottom: 14px;
+	}
+	.step h3 { font-size: 1.15rem; margin-bottom: 8px; font-weight: 700; }
+	.step p { color: var(--ink-dim); font-size: 0.94rem; }
+
+	.cta-band {
+		text-align: center;
+		padding: 90px 0;
+	}
+	.cta-band h2 {
+		font-family: var(--display);
+		font-weight: 900;
+		font-size: clamp(2rem, 6vw, 3.4rem);
+		margin-bottom: 26px;
+		letter-spacing: -0.01em;
+	}
+
+	footer {
+		border-top: 1px solid rgba(255,255,255,0.08);
+		padding: 40px 0 60px;
+		text-align: center;
+	}
+	.footer-links {
+		display: flex;
+		gap: 26px;
+		justify-content: center;
+		flex-wrap: wrap;
+		margin-bottom: 18px;
+	}
+	.footer-links a {
+		color: var(--ink-dim);
+		text-decoration: none;
+		font-size: 0.9rem;
+		transition: color 0.16s ease;
+	}
+	.footer-links a:hover { color: var(--gold-bright); }
+	.footer-brand { font-family: var(--display); font-weight: 600; color: var(--gold); }
+	.copyright { font-size: 0.82rem; color: var(--ink-dim); margin-top: 8px; }
+
+	:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 3px; }
+
+	@media (prefers-reduced-motion: reduce) {
+		* { animation: none !important; transition: none !important; scroll-behavior: auto; }
+	}
+
+	@media (max-width: 480px) {
+		.key.white { width: 40px; }
+		.keyboard { height: 168px; }
+		.key.white { height: 168px; }
+		.key.black { height: 102px; }
+	}
+</style>
+</head>
+<body>
+<div class="backdrop"></div>
+
+<div class="wrap">
+	<header>
+		<div class="brand"><span class="dot"></span> Pitch Memory</div>
+		<a href="#dapatkan" class="nav-cta">Unduh Gratis</a>
+	</header>
+
+	<div class="hero">
+		<p class="eyebrow">Ear Training · Android</p>
+		<h1>Latih telingamu,<br>satu nada demi nada.</h1>
+		<p class="lede">Dengarkan urutan nada piano, lalu tirukan dari ingatan. Tiap ronde menambah satu nada — sampai telingamu benar-benar tajam.</p>
+		<p class="sub">Coba di bawah ini — sentuh tuts atau tekan <em>Dengarkan urutan</em>.</p>
+
+		<div class="keyboard-stage">
+			<div class="kb-hint" id="hint">Sentuh tuts mana pun untuk membunyikannya.</div>
+			<div class="keyboard" id="keyboard"></div>
+			<div class="kb-controls">
+				<button class="listen-btn" id="listenBtn">▶  Dengarkan urutan</button>
+			</div>
+		</div>
+
+		<div class="store-row" id="dapatkan">
+			<a class="gplay" href="#" id="playLink" aria-label="Dapatkan di Google Play">
+				<svg viewBox="0 0 512 512" aria-hidden="true">
+					<path fill="#00d3ff" d="M47 20 285 258 47 496c-9-5-15-15-15-27V47c0-12 6-22 15-27z"/>
+					<path fill="#00f076" d="M47 20c4-2 9-3 14-2l278 160-54 54z"/>
+					<path fill="#ff3a44" d="M339 178l88 51c19 11 19 43 0 54l-88 51-54-53z"/>
+					<path fill="#ffc900" d="M47 496l238-238 54 54L61 494c-5 3-10 4-14 2z"/>
+				</svg>
+				<span class="gp-text">
+					<span class="gp-small">Dapatkan di</span>
+					<span class="gp-big">Google Play</span>
+				</span>
+			</a>
+			<p class="store-note">Segera hadir · gratis · tanpa iklan</p>
+		</div>
+	</div>
+</div>
+
+<section>
+	<div class="wrap">
+		<p class="sec-eyebrow">Kenapa Pitch Memory</p>
+		<h2 class="sec-title">Sederhana untuk dimulai,<br>menantang untuk dikuasai.</h2>
+		<div class="features">
+			<div class="feature">
+				<span class="ico">🎧</span>
+				<h3>Melatih pendengaran</h3>
+				<p>Kenali nada dengan telinga, bukan mata. Setiap tuts punya warna dan bunyinya sendiri.</p>
+			</div>
+			<div class="feature">
+				<span class="ico">🎹</span>
+				<h3>25 level bertingkat</h3>
+				<p>Dari triad sederhana hingga urutan kromatik yang cepat. Tiga bintang menanti di setiap level.</p>
+			</div>
+			<div class="feature">
+				<span class="ico">📴</span>
+				<h3>Main tanpa internet</h3>
+				<p>Sepenuhnya offline. Progresmu tersimpan di perangkat — tak ada akun, tak ada data yang dikumpulkan.</p>
+			</div>
+			<div class="feature">
+				<span class="ico">✨</span>
+				<h3>Gratis &amp; tanpa iklan</h3>
+				<p>Tanpa iklan yang mengganggu, tanpa pembelian. Cuma kamu, nada-nada, dan ingatanmu.</p>
+			</div>
+		</div>
+	</div>
+</section>
+
+<section>
+	<div class="wrap">
+		<p class="sec-eyebrow">Cara main</p>
+		<h2 class="sec-title">Tiga langkah, satu tujuan.</h2>
+		<div class="steps">
+			<div class="step">
+				<div class="num">01</div>
+				<h3>Dengarkan</h3>
+				<p>Game memainkan urutan nada. Tuts menyala mengikuti setiap nada yang dibunyikan.</p>
+			</div>
+			<div class="step">
+				<div class="num">02</div>
+				<h3>Tirukan</h3>
+				<p>Ulangi urutan itu di keyboard dari ingatan. Benar? Ronde berikutnya menambah satu nada.</p>
+			</div>
+			<div class="step">
+				<div class="num">03</div>
+				<h3>Naik level</h3>
+				<p>Selesaikan tanpa salah untuk tiga bintang. Buka level demi level hingga telingamu tak terkalahkan.</p>
+			</div>
+		</div>
+	</div>
+</section>
+
+<div class="cta-band wrap">
+	<h2>Siap menajamkan telingamu?</h2>
+	<div class="store-row">
+		<a class="gplay" href="#" aria-label="Dapatkan di Google Play">
+			<svg viewBox="0 0 512 512" aria-hidden="true">
+				<path fill="#00d3ff" d="M47 20 285 258 47 496c-9-5-15-15-15-27V47c0-12 6-22 15-27z"/>
+				<path fill="#00f076" d="M47 20c4-2 9-3 14-2l278 160-54 54z"/>
+				<path fill="#ff3a44" d="M339 178l88 51c19 11 19 43 0 54l-88 51-54-53z"/>
+				<path fill="#ffc900" d="M47 496l238-238 54 54L61 494c-5 3-10 4-14 2z"/>
+			</svg>
+			<span class="gp-text">
+				<span class="gp-small">Dapatkan di</span>
+				<span class="gp-big">Google Play</span>
+			</span>
+		</a>
+	</div>
+</div>
+
+<footer>
+	<div class="wrap">
+		<div class="footer-links">
+			<a href="privacy_policy.html">Kebijakan Privasi</a>
+			<a href="#dapatkan">Unduh</a>
+			<a href="mailto:kidswandaru@gmail.com">Kontak</a>
+		</div>
+		<p>Dibuat oleh <span class="footer-brand">Kidaku</span></p>
+		<p class="copyright">© 2026 Kidaku. Pitch Memory.</p>
+	</div>
+</footer>
+
+<script>
+(function () {
+	"use strict";
+	var NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+	var WHITE = [0, 2, 4, 5, 7, 9, 11];
+	var isBlack = function (s) { return WHITE.indexOf(s) === -1; };
+
+	// --- Web Audio: satu oscillator per nada, envelope lembut ---
+	var actx = null;
+	function ensureAudio() {
+		if (!actx) {
+			try { actx = new (window.AudioContext || window.webkitAudioContext)(); }
+			catch (e) { actx = null; }
+		}
+		if (actx && actx.state === "suspended") actx.resume();
+		return actx;
+	}
+	function freq(semitone) { return 261.63 * Math.pow(2, semitone / 12); }
+	function playNote(semitone) {
+		var ctx = ensureAudio();
+		if (!ctx) return;
+		var t = ctx.currentTime;
+		var osc = ctx.createOscillator();
+		var gain = ctx.createGain();
+		osc.type = "triangle";
+		osc.frequency.value = freq(semitone);
+		gain.gain.setValueAtTime(0.0001, t);
+		gain.gain.exponentialRampToValueAtTime(0.22, t + 0.012);
+		gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+		osc.connect(gain).connect(ctx.destination);
+		osc.start(t);
+		osc.stop(t + 0.95);
+	}
+
+	// --- Bangun keyboard 12 nada (C4–B4) ---
+	var kb = document.getElementById("keyboard");
+	var hint = document.getElementById("hint");
+	var keyEls = {};
+	var whites = [], blacks = [];
+	for (var s = 0; s < 12; s++) (isBlack(s) ? blacks : whites).push(s);
+
+	whites.forEach(function (s) {
+		var b = makeKey(s, false);
+		kb.appendChild(b);
+	});
+	// hitung posisi tuts hitam relatif ke tuts putih kiri (s-1)
+	requestAnimationFrame(function () {
+		blacks.forEach(function (s) {
+			var leftWhite = keyEls[s - 1];
+			if (!leftWhite) return;
+			var b = makeKey(s, true);
+			kb.appendChild(b);
+			var kbRect = kb.getBoundingClientRect();
+			var lw = leftWhite.getBoundingClientRect();
+			b.style.left = (lw.right - kbRect.left - b.offsetWidth / 2) + "px";
+		});
+	});
+
+	function makeKey(s, black) {
+		var b = document.createElement("button");
+		b.className = "key " + (black ? "black" : "white");
+		b.style.color = "hsl(" + (s / 12 * 360) + ", 85%, 60%)"; // warna glow = hue nada
+		b.setAttribute("aria-label", "Nada " + NOTE_NAMES[s]);
+		var glow = document.createElement("span"); glow.className = "glow";
+		var label = document.createElement("span"); label.className = "label"; label.textContent = NOTE_NAMES[s];
+		b.appendChild(glow); b.appendChild(label);
+		var press = function (ev) {
+			ev.preventDefault();
+			hit(s);
+		};
+		b.addEventListener("pointerdown", press);
+		keyEls[s] = b;
+		return b;
+	}
+
+	function light(s, ms) {
+		var el = keyEls[s];
+		if (!el) return;
+		el.classList.add("lit");
+		setTimeout(function () { el.classList.remove("lit"); }, ms || 260);
+	}
+
+	function hit(s) {
+		playNote(s);
+		light(s, 260);
+		hint.textContent = "Nada " + NOTE_NAMES[s];
+		hint.style.color = "hsl(" + (s / 12 * 360) + ", 70%, 70%)";
+	}
+
+	// --- Demo "Dengarkan urutan" (triad C–E–G–E–C, seperti Level 1) ---
+	var listenBtn = document.getElementById("listenBtn");
+	var SEQ = [0, 4, 7, 4, 0];
+	var STEP = 480;
+	listenBtn.addEventListener("click", function () {
+		ensureAudio();
+		listenBtn.disabled = true;
+		hint.textContent = "Dengarkan…";
+		hint.style.color = "";
+		SEQ.forEach(function (s, i) {
+			setTimeout(function () {
+				playNote(s);
+				light(s, STEP * 0.8);
+			}, i * STEP);
+		});
+		setTimeout(function () {
+			listenBtn.disabled = false;
+			hint.textContent = "Sekarang giliranmu — tirukan!";
+		}, SEQ.length * STEP + 200);
+	});
+})();
+</script>
+</body>
+</html>
